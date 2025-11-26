@@ -1,0 +1,2 @@
+# megaton
+megaton calculator
