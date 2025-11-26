@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MEGATON Calculator</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            --bg: #1e1c1a;
+            --canvas: #2c2621;
+            --accent: #f1c27d;
+            --accent-dark: #c18452;
+            --text: #f4f1ea;
+            --shadow: rgba(0, 0, 0, 0.45);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            /* Windows-styled queue window */
+            .window {
+                background: rgba(18,13,9,0.85);
+                border-radius: 14px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .titlebar {
+                background: linear-gradient(180deg, rgba(255,231,196,0.15), rgba(0,0,0,0.25));
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem 0.75rem;
+                border-bottom: 1px solid rgba(241,194,125,0.25);
+            }
+            .titlebar .win-buttons { display: flex; gap: 0.35rem; margin-right: 0.5rem; }
+            .titlebar .win-btn { width: 12px; height: 12px; border-radius: 2px; background: #d9c0a1; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+            .titlebar .win-btn.min { background: #e7cfb1; }
+            .titlebar .win-btn.max { background: #dcb88e; }
+            .titlebar .win-btn.close { background: #c77b3e; }
+            .titlebar h2 { margin: 0; font-size: 0.95rem; letter-spacing: 0.03em; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+            .titlebar .desert-mark { width: 18px; height: 18px; }
+            .window .content { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+            .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+            .toolbar button { font-size: 0.9rem; padding: 0.5rem 0.75rem; border-radius: 10px; background: linear-gradient(145deg, #f1c27d, #c18452); color: #2a1608; font-weight: 600; }
+            .tree { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.5rem; max-height: 460px; overflow: auto; box-shadow: inset 0 0 20px rgba(0,0,0,0.35); }
+            .tree ul { list-style: none; margin: 0; padding-left: 1rem; }
+            .tree li { position: relative; margin: 0.15rem 0; padding-left: 1rem; }
+            .tree .caret { position: absolute; left: 0; top: 0.35rem; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid #d3a46d; cursor: pointer; transition: transform 0.2s ease; }
+            .tree .caret.open { transform: rotate(90deg); }
+            .node-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.35rem; border-radius: 8px; }
+            .node-row.selected { outline: 2px solid rgba(241,194,125,0.35); background: rgba(241,194,125,0.08); }
+            .badge { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: rgba(241,194,125,0.22); color: var(--accent); }
+            .node-actions { margin-left: auto; display: flex; gap: 0.3rem; }
+            .node-actions button { font-size: 0.75rem; padding: 0.25rem 0.45rem; border-radius: 6px; background: linear-gradient(145deg, rgba(55,39,30,0.95), rgba(18,13,9,0.95)); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+            .hint { opacity: 0.8; font-size: 0.8rem; }
+            height: 60px;
+            background: rgba(255,255,255,0.25);
+            filter: blur(0.5px);
+            border-radius: 50px;
+            box-shadow: 60px 10px 0 10px rgba(255,255,255,0.18), -40px 15px 0 5px rgba(255,255,255,0.2);
+            animation: cloudLeftRight 90s linear infinite;
+        }
+        .desert .clouds .c1 { left: -20%; top: 12%; animation-duration: 95s; }
+        .desert .clouds .c2 { left: -40%; top: 18%; animation-duration: 80s; }
+        .desert .clouds .c3 { left: -30%; top: 24%; animation-duration: 110s; }
+        .desert .clouds .c4 { left: -50%; top: 30%; animation-duration: 100s; }
+        .desert .dunes .dune {
+            position: absolute;
+            bottom: -20px;
+            width: 140%;
+            left: -20%;
+            height: 45vh;
+            background: radial-gradient(80% 60% at 50% 90%, #9a6337 0%, #6e3f23 60%, #432515 100%);
+            border-top-left-radius: 55% 60%;
+            border-top-right-radius: 55% 60%;
+            transform: translateY(0) rotate(0.001deg);
+            animation: duneBreathe 14s ease-in-out infinite alternate;
+            opacity: 0.95;
+        }
+        .desert .dunes .d2 {
+            bottom: -30px;
+            height: 38vh;
+            background: radial-gradient(80% 60% at 45% 90%, #b67a45 0%, #7c4b2a 60%, #4b2a17 100%);
+            animation-duration: 18s;
+            opacity: 0.9;
+        }
+        .desert .dunes .d3 {
+            bottom: -40px;
+            height: 28vh;
+            background: radial-gradient(80% 60% at 55% 90%, #cc9356 0%, #8f5731 60%, #5a361f 100%);
+            animation-duration: 22s;
+            opacity: 0.85;
+        }
+        .desert .heat {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 6px);
+            mix-blend-mode: soft-light;
+            animation: shimmer 6s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes cloudLeftRight { from { transform: translateX(0); } to { transform: translateX(220%); } }
+        @keyframes sunDrift { 0% { transform: translate(-10px, 10px); } 100% { transform: translate(10px, -10px); } }
+        @keyframes skyShift { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(-10deg) brightness(0.95); } }
+        @keyframes duneBreathe { 0% { transform: translateY(0px); } 100% { transform: translateY(-8px); } }
+        @keyframes shimmer { 0% { opacity: 0.25; } 50% { opacity: 0.35; } 100% { opacity: 0.25; } }
+        @media (prefers-reduced-motion: reduce) {
+            .desert * { animation: none !important; }
+        }
+        .scene {
+            width: 92vw;
+            max-width: 1100px;
+            padding: 2rem;
+            border-radius: 30px;
+            background: linear-gradient(145deg, rgba(52,38,27,0.95), rgba(21,15,11,0.95));
+            box-shadow: 0 30px 60px var(--shadow), inset 0 0 120px rgba(255, 255, 255, 0.03);
+            border: 3px solid rgba(241,194,125,0.35);
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            backdrop-filter: blur(20px);
+        }
+        .canvas {
+            background: linear-gradient(180deg, rgba(255,233,197,0.15), rgba(0,0,0,0.25));
+            border-radius: 24px;
+            padding: 1.5rem;
+            box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.35);
+            position: relative;
+        }
+        .canvas::after {
+            content: "";
+            position: absolute;
+            inset: 1rem;
+            border: 1px solid rgba(241,194,125,0.25);
+            border-radius: 18px;
+            pointer-events: none;
+        }
+        .display {
+            background: rgba(15,10,7,0.7);
+            border-radius: 18px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+            font-size: 2rem;
+            text-align: right;
+            min-height: 64px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .display .expression {
+            font-size: 1rem;
+            opacity: 0.7;
+        }
+        .keys {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+        }
+        button {
+            border: none;
+            border-radius: 18px;
+            padding: 1rem;
+            font-size: 1.1rem;
+            background: linear-gradient(145deg, rgba(55,39,30,0.95), rgba(18,13,9,0.95));
+            color: var(--text);
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.45), inset 0 0 0 rgba(255,255,255,0);
+        }
+        button:hover {
+            box-shadow: 0 12px 24px rgba(0,0,0,0.6), inset 0 0 0 rgba(255,255,255,0.1);
+        }
+        button:active {
+            transform: translateY(2px);
+        }
+        .key-operator {
+            background: linear-gradient(145deg, #f1c27d, #c18452);
+            color: #2a1608;
+            font-weight: 600;
+        }
+        .key-equal {
+            grid-column: span 2;
+            background: linear-gradient(145deg, #f8d7a4, #e0a15b);
+            color: #2b1406;
+            font-weight: 700;
+        }
+        .history {
+            background: rgba(0,0,0,0.35);
+            border-radius: 24px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.45);
+        }
+        .history h2 {
+            margin: 0;
+            font-weight: 600;
+            letter-spacing: 0.07em;
+            color: var(--accent);
+        }
+        /* End window styles */
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 400px;
+            padding-right: 0.5rem;
+        }
+        .history-item {
+            padding: 0.6rem;
+            border-bottom: 1px solid rgba(241,194,125,0.2);
+            font-size: 0.95rem;
+        }
+        .history-item span {
+            display: block;
+            opacity: 0.8;
+        }
+        .empty-history {
+            opacity: 0.6;
+            font-style: italic;
+        }
+        @media (max-width: 900px) {
+            .scene {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Animation + transition overrides (disable all animations) */
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+        button:active { transform: none !important; }
+        /* Fix body overrides caused by earlier nested CSS */
+        body { display: flex !important; justify-content: center !important; align-items: center !important; height: auto !important; filter: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        /* Desert elements static (no animation) */
+        .desert { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+        .desert .sky { position: absolute; inset: 0; background: linear-gradient(180deg, #f2c98d 0%, #e09a55 35%, #7f4b2b 70%, #2a1b12 100%); }
+        .desert .sun { position: absolute; width: 180px; height: 180px; left: 65%; top: 8%; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe9b3 0%, #ffd27e 40%, #ffb54d 70%, rgba(255,143,0,0.85) 100%); box-shadow: 0 0 60px rgba(255, 190, 92, 0.8), 0 0 120px rgba(255, 190, 92, 0.5); }
+        .desert .clouds span { position: absolute; width: 220px; height: 60px; background: rgba(255,255,255,0.25); filter: none; border-radius: 50px; box-shadow: 60px 10px 0 10px rgba(255,255,255,0.18), -40px 15px 0 5px rgba(255,255,255,0.2); }
+        .desert .clouds .c1 { left: 10%; top: 12%; }
+        .desert .clouds .c2 { left: 28%; top: 18%; }
+        .desert .clouds .c3 { left: 55%; top: 24%; }
+        .desert .clouds .c4 { left: 75%; top: 30%; }
+        .desert .dunes .dune { position: absolute; bottom: -20px; width: 140%; left: -20%; height: 45vh; background: radial-gradient(80% 60% at 50% 90%, #9a6337 0%, #6e3f23 60%, #432515 100%); border-top-left-radius: 55% 60%; border-top-right-radius: 55% 60%; }
+        .desert .dunes .d2 { bottom: -30px; height: 38vh; background: radial-gradient(80% 60% at 45% 90%, #b67a45 0%, #7c4b2a 60%, #4b2a17 100%); }
+        .desert .dunes .d3 { bottom: -40px; height: 28vh; background: radial-gradient(80% 60% at 55% 90%, #cc9356 0%, #8f5731 60%, #5a361f 100%); }
+        .desert .heat { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02)); mix-blend-mode: soft-light; pointer-events: none; }
+        /* Windows-styled queue window (static) */
+        .window { background: rgba(18,13,9,0.85); border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        .titlebar { background: linear-gradient(180deg, rgba(255,231,196,0.15), rgba(0,0,0,0.25)); display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(241,194,125,0.25); }
+        .titlebar .win-buttons { display: flex; gap: 0.35rem; margin-right: 0.5rem; }
+        .titlebar .win-btn { width: 12px; height: 12px; border-radius: 2px; background: #d9c0a1; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+        .titlebar .win-btn.min { background: #e7cfb1; }
+        .titlebar .win-btn.max { background: #dcb88e; }
+        .titlebar .win-btn.close { background: #c77b3e; }
+        .titlebar h2 { margin: 0; font-size: 0.95rem; letter-spacing: 0.03em; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+        .titlebar .desert-mark { width: 18px; height: 18px; }
+        .window .content { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .toolbar button { font-size: 0.9rem; padding: 0.5rem 0.75rem; border-radius: 10px; background: linear-gradient(145deg, #f1c27d, #c18452); color: #2a1608; font-weight: 600; }
+        .tree { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.5rem; max-height: 460px; overflow: auto; box-shadow: inset 0 0 20px rgba(0,0,0,0.35); }
+        .tree ul { list-style: none; margin: 0; padding-left: 1rem; }
+        .tree li { position: relative; margin: 0.15rem 0; padding-left: 1rem; }
+        .tree .caret { position: absolute; left: 0; top: 0.35rem; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid #d3a46d; cursor: pointer; }
+        .node-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.35rem; border-radius: 8px; }
+        .node-row.selected { outline: 2px solid rgba(241,194,125,0.35); background: rgba(241,194,125,0.08); }
+        .badge { font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: rgba(241,194,125,0.22); color: var(--accent); }
+        .node-actions { margin-left: auto; display: flex; gap: 0.3rem; }
+        .node-actions button { font-size: 0.75rem; padding: 0.25rem 0.45rem; border-radius: 6px; background: linear-gradient(145deg, rgba(55,39,30,0.95), rgba(18,13,9,0.95)); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+        .hint { opacity: 0.8; font-size: 0.8rem; }
+        .doc { background: rgba(0,0,0,0.25); border: 1px solid rgba(241,194,125,0.2); border-radius: 12px; padding: 0.75rem; }
+        .doc h3 { margin: 0 0 0.35rem 0; color: var(--accent); font-size: 1rem; }
+        .doc ul { margin: 0.25rem 0 0.5rem 1rem; padding: 0; }
+        .doc li { margin: 0.15rem 0; }
+    </style>
+</head>
+<body>
+    <!-- Animated background behind content -->
+    <div class="desert" aria-hidden="true">
+        <div class="sky"></div>
+        <div class="sun"></div>
+        <div class="clouds">
+            <span class="cloud c1"></span>
+            <span class="cloud c2"></span>
+            <span class="cloud c3"></span>
+            <span class="cloud c4"></span>
+        </div>
+        <div class="dunes">
+            <div class="dune d1"></div>
+            <div class="dune d2"></div>
+            <div class="dune d3"></div>
+        </div>
+        <div class="heat"></div>
+    </div>
+
+    <main class="scene" style="position: relative; z-index: 1;">
+        <section class="canvas">
+            <div class="display">
+                <div class="expression" id="expression"></div>
+                <div id="result">0</div>
+            </div>
+            <div class="keys">
+                <button class="key-operator" data-action="clear">AC</button>
+                <button class="key-operator" data-action="sign">±</button>
+                <button class="key-operator" data-action="percent">%</button>
+                <button class="key-operator" data-value="/">÷</button>
+
+                <button data-value="7">7</button>
+                <button data-value="8">8</button>
+                <button data-value="9">9</button>
+                <button class="key-operator" data-value="*">×</button>
+
+                <button data-value="4">4</button>
+                <button data-value="5">5</button>
+                <button data-value="6">6</button>
+                <button class="key-operator" data-value="-">−</button>
+
+                <button data-value="1">1</button>
+                <button data-value="2">2</button>
+                <button data-value="3">3</button>
+                <button class="key-operator" data-value="+">+</button>
+
+                <button data-value="0" style="grid-column: span 2;">0</button>
+                <button data-value=".">.</button>
+                <button class="key-equal" data-action="equals">=</button>
+
+                <button data-action="sin">sin</button>
+                <button data-action="cos">cos</button>
+                <button data-action="tan">tan</button>
+                <button data-action="sqrt">√</button>
+
+                <button data-action="pow">xʸ</button>
+                <button data-action="log">log</button>
+                <button data-action="ln">ln</button>
+                <button data-action="pi">π</button>
+            </div>
+        </section>
+
+        <aside class="window" id="queue-window">
+            <div class="titlebar">
+                <div class="win-buttons">
+                    <div class="win-btn min" title="Minimize"></div>
+                    <div class="win-btn max" title="Maximize"></div>
+                    <div class="win-btn close" title="Close"></div>
+                </div>
+                <svg class="desert-mark" viewBox="0 0 64 64" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="duneGrad" x1="0" x2="1">
+                            <stop offset="0" stop-color="#f1c27d"/>
+                            <stop offset="1" stop-color="#c18452"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M2 46 C 14 38, 30 38, 46 46 S 62 54, 62 54 L 2 54 Z" fill="url(#duneGrad)"/>
+                    <rect x="30" y="24" width="4" height="14" rx="1" fill="#8f5731"/>
+                    <rect x="26" y="28" width="4" height="10" rx="1" fill="#8f5731"/>
+                </svg>
+                <h2>Computation Queue</h2>
+            </div>
+            <div class="content">
+                <div class="toolbar">
+                    <button id="btn-add-number">+ Number</button>
+                    <button id="btn-add-op">+ Operation</button>
+                    <button id="btn-compute-selected">Compute Selected</button>
+                    <button id="btn-compute-all">Compute All</button>
+                    <button id="btn-clear-queue">Clear Queue</button>
+                </div>
+                <div class="tree" id="queue-tree" role="tree" aria-label="Computation Queue Tree"></div>
+                <div class="hint">Tip: Select a node to add children or compute it.</div>
+                <div class="doc" id="docs">
+                    <h3>Shortcuts</h3>
+                    <ul>
+                        <li>Calculator: 0–9, ., +, -, *, /</li>
+                        <li>Calculator: Enter or = → equals; Esc or C → clear</li>
+                        <li>Calculator: % → percent; S → sign; ^ → power; P → π</li>
+                        <li>Queue: N → add number; O → add operation</li>
+                        <li>Queue: R → compute selected; A → compute all; X → clear</li>
+                    </ul>
+                    <h3>Queue Usage</h3>
+                    <ul>
+                        <li>Add an operation, then add numbers or child ops under it.</li>
+                        <li>Select a node to run or to append children via buttons/shortcuts.</li>
+                        <li>Results annotate nodes as badges; selected result shows in display.</li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        var exprEl = document.getElementById("expression");
+        var resultEl = document.getElementById("result");
+
+        var expression = "";
+        var currentValue = "0";
+        var lastResult = null;
+
+        /* History removed */
+
+        function updateDisplay() {
+            exprEl.textContent = expression;
+            resultEl.textContent = currentValue;
+        }
+
+        function handleNumber(value) {
+            if (currentValue === "0" && value !== ".") currentValue = value;
+            else currentValue += value;
+            updateDisplay();
+        }
+
+        function handleOperator(value) {
+            if (currentValue) {
+                expression += currentValue + " " + value + " ";
+                currentValue = "";
+                updateDisplay();
+            }
+        }
+
+        function evaluateExpression() {
+            try {
+                var cleanExpr = (expression + currentValue).replace(/÷/g, "/").replace(/×/g, "*");
+                var safeExpr = cleanExpr.replace(/[^0-9+\-*/().%^\s]/g, "");
+                /* eslint-disable no-new-func */
+                var res = Function("return " + safeExpr)();
+                if (typeof res !== "undefined") {
+                    lastResult = res;
+                    expression = "";
+                    currentValue = String(res);
+                    updateDisplay();
+                }
+            } catch (e) {
+                currentValue = "Error";
+                updateDisplay();
+                expression = "";
+                currentValue = "0";
+            }
+        }
+
+        function applyFunction(fn) {
+            var value = currentValue || lastResult || "0";
+            var computed = value;
+            var num = parseFloat(value);
+            switch (fn) {
+                case "sin": computed = String(Math.sin(num)); break;
+                case "cos": computed = String(Math.cos(num)); break;
+                case "tan": computed = String(Math.tan(num)); break;
+                case "sqrt": computed = String(Math.sqrt(num)); break;
+                case "log": computed = String(Math.log10(num)); break;
+                case "ln": computed = String(Math.log(num)); break;
+                case "pi": computed = String(Math.PI); break;
+            }
+            currentValue = computed;
+            updateDisplay();
+        }
+
+        (function() {
+            var buttons = document.querySelectorAll(".keys button");
+            for (var i = 0; i < buttons.length; i++) {
+                (function(btn){
+                    btn.addEventListener("click", function(){
+                        var value = btn.getAttribute("data-value");
+                        var action = btn.getAttribute("data-action");
+
+                        if (value) {
+                            if (value === "+" || value === "-" || value === "*" || value === "/") handleOperator(value);
+                            else handleNumber(value);
+                        } else if (action) {
+                            switch (action) {
+                                case "clear":
+                                    expression = "";
+                                    currentValue = "0";
+                                    updateDisplay();
+                                    break;
+                                case "sign":
+                                    currentValue = String(parseFloat(currentValue) * -1);
+                                    updateDisplay();
+                                    break;
+                                case "percent":
+                                    currentValue = String(parseFloat(currentValue) / 100);
+                                    updateDisplay();
+                                    break;
+                                case "equals":
+                                    evaluateExpression();
+                                    break;
+                                case "pow":
+                                    expression += currentValue + " ** ";
+                                    currentValue = "";
+                                    updateDisplay();
+                                    break;
+                                default:
+                                    applyFunction(action);
+                            }
+                        }
+                    });
+                })(buttons[i]);
+            }
+        })();
+
+        // Queue system with hierarchical tree view
+        (function(){
+            var treeEl = document.getElementById('queue-tree');
+            var btnAddNum = document.getElementById('btn-add-number');
+            var btnAddOp = document.getElementById('btn-add-op');
+            var btnComputeSel = document.getElementById('btn-compute-selected');
+            var btnComputeAll = document.getElementById('btn-compute-all');
+            var btnClear = document.getElementById('btn-clear-queue');
+
+            var idSeq = 1;
+            function nextId() { idSeq += 1; return 'n' + idSeq; }
+
+            var root = { id: 'root', type: 'root', label: 'Queue', children: [] };
+            var selectedId = null;
+            var collapsed = {};
+
+            function findNode(node, id) {
+                if (!node) return null;
+                if (node.id === id) return node;
+                if (node.children) {
+                    for (var i=0;i<node.children.length;i++){
+                        var found = findNode(node.children[i], id);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+
+            function removeNode(parent, id) {
+                if (!parent || !parent.children) return false;
+                for (var i=0;i<parent.children.length;i++){
+                    if (parent.children[i].id === id) { parent.children.splice(i,1); return true; }
+                    if (removeNode(parent.children[i], id)) return true;
+                }
+                return false;
+            }
+
+            function renderTree() {
+                if (!treeEl) return;
+                treeEl.innerHTML = '';
+                var ul = document.createElement('ul');
+                ul.setAttribute('role', 'group');
+                treeEl.appendChild(ul);
+                for (var i=0;i<root.children.length;i++){
+                    ul.appendChild(renderNode(root.children[i], 0));
+                }
+            }
+
+            function nodeTitle(node){
+                if (node.type === 'number') return 'Number: ' + node.value;
+                if (node.type === 'op') return 'Op: ' + node.op;
+                return node.label || node.type;
+            }
+
+            function renderNode(node, depth){
+                var li = document.createElement('li');
+                li.setAttribute('role', 'treeitem');
+                li.setAttribute('aria-level', String(depth+1));
+                li.setAttribute('data-id', node.id);
+
+                var hasChildren = node.children && node.children.length > 0;
+                if (hasChildren) {
+                    var caret = document.createElement('span');
+                    caret.className = 'caret' + (collapsed[node.id] ? '' : ' open');
+                    caret.addEventListener('click', function(e){
+                        e.stopPropagation();
+                        collapsed[node.id] = !collapsed[node.id];
+                        renderTree();
+                    });
+                    li.appendChild(caret);
+                }
+
+                var row = document.createElement('div');
+                row.className = 'node-row' + (selectedId === node.id ? ' selected' : '');
+                row.addEventListener('click', function(){ selectedId = node.id; renderTree(); });
+
+                var label = document.createElement('span');
+                label.textContent = nodeTitle(node);
+                row.appendChild(label);
+
+                if (typeof node.result !== 'undefined'){
+                    var badge = document.createElement('span');
+                    badge.className = 'badge';
+                    badge.textContent = '= ' + node.result;
+                    row.appendChild(badge);
+                }
+
+                var actions = document.createElement('div');
+                actions.className = 'node-actions';
+                var addNumBtn = document.createElement('button'); addNumBtn.textContent = '+Num';
+                addNumBtn.addEventListener('click', function(e){ e.stopPropagation(); addNumber(node.id); });
+                var addOpBtn = document.createElement('button'); addOpBtn.textContent = '+Op';
+                addOpBtn.addEventListener('click', function(e){ e.stopPropagation(); addOperation(node.id); });
+                var computeBtn = document.createElement('button'); computeBtn.textContent = 'Run';
+                computeBtn.addEventListener('click', function(e){ e.stopPropagation(); computeAndAnnotate(node); renderTree(); resultEl.textContent = String(node.result); });
+                var removeBtn = document.createElement('button'); removeBtn.textContent = 'X';
+                removeBtn.addEventListener('click', function(e){ e.stopPropagation(); removeNode(root, node.id); if (selectedId===node.id) selectedId=null; renderTree(); });
+                actions.appendChild(addNumBtn);
+                actions.appendChild(addOpBtn);
+                actions.appendChild(computeBtn);
+                actions.appendChild(removeBtn);
+                row.appendChild(actions);
+                li.appendChild(row);
+
+                if (hasChildren && !collapsed[node.id]){
+                    var ul = document.createElement('ul');
+                    ul.setAttribute('role', 'group');
+                    for (var i=0;i<node.children.length;i++){
+                        ul.appendChild(renderNode(node.children[i], depth+1));
+                    }
+                    li.appendChild(ul);
+                }
+                return li;
+            }
+
+            function getSelectedParent(){
+                var target = root;
+                if (selectedId){
+                    var sel = findNode(root, selectedId);
+                    if (sel && sel.type !== 'number') target = sel; else {
+                        // if a number is selected, add to its parent instead
+                        target = findParent(root, selectedId) || root;
+                    }
+                }
+                return target;
+            }
+
+            function findParent(node, id){
+                if (!node || !node.children) return null;
+                for (var i=0;i<node.children.length;i++){
+                    var ch = node.children[i];
+                    if (ch.id === id) return node;
+                    var p = findParent(ch, id);
+                    if (p) return p;
+                }
+                return null;
+            }
+
+            function addNumber(targetId){
+                var target = targetId ? findNode(root, targetId) : getSelectedParent();
+                if (!target) target = root;
+                var valStr = window.prompt('Enter number value:', '0');
+                if (valStr === null) return;
+                var num = parseFloat(valStr);
+                if (isNaN(num)) { alert('Invalid number'); return; }
+                if (!target.children) target.children = [];
+                target.children.push({ id: nextId(), type: 'number', value: num, children: [] });
+                renderTree();
+            }
+
+            function addOperation(targetId){
+                var target = targetId ? findNode(root, targetId) : getSelectedParent();
+                if (!target) target = root;
+                var op = window.prompt('Enter operation (+,-,*,/,pow,sin,cos,tan,sqrt,log,ln):', '+');
+                if (!op) return;
+                op = op.trim();
+                var allowed = { '+':1,'-':1,'*':1,'/':1,'pow':1,'sin':1,'cos':1,'tan':1,'sqrt':1,'log':1,'ln':1 };
+                if (!allowed[op]) { alert('Unsupported op'); return; }
+                if (!target.children) target.children = [];
+                target.children.push({ id: nextId(), type: 'op', op: op, children: [] });
+                renderTree();
+            }
+
+            function computeNode(node){
+                if (!node) return NaN;
+                if (node.type === 'number') return parseFloat(node.value);
+                if (node.type === 'op'){
+                    var vals = [];
+                    for (var i=0;i<(node.children?node.children.length:0);i++){
+                        vals.push(computeNode(node.children[i]));
+                    }
+                    var r, j;
+                    switch(node.op){
+                        case 'sin': return Math.sin(vals[0]||0);
+                        case 'cos': return Math.cos(vals[0]||0);
+                        case 'tan': return Math.tan(vals[0]||0);
+                        case 'sqrt': return Math.sqrt(vals[0]||0);
+                        case 'log': return Math.log10(vals[0]||0);
+                        case 'ln': return Math.log(vals[0]||0);
+                        case 'pow':
+                            if (vals.length===0) return NaN;
+                            r = vals[0];
+                            for (j=1;j<vals.length;j++) r = Math.pow(r, vals[j]);
+                            return r;
+                        case '+':
+                            r = 0; for (j=0;j<vals.length;j++) r += vals[j]; return r;
+                        case '*':
+                            r = 1; for (j=0;j<vals.length;j++) r *= vals[j]; return r;
+                        case '-':
+                            if (vals.length===0) return NaN; r = vals[0]; for (j=1;j<vals.length;j++) r -= vals[j]; return r;
+                        case '/':
+                            if (vals.length===0) return NaN; r = vals[0]; for (j=1;j<vals.length;j++) r = r / vals[j]; return r;
+                    }
+                    return NaN;
+                }
+                // root not directly computed
+                return NaN;
+            }
+
+            function computeAndAnnotate(node){
+                if (!node) return NaN;
+                var val = computeNode(node);
+                node.result = val;
+                if (node.children){
+                    for (var i=0;i<node.children.length;i++) computeAndAnnotate(node.children[i]);
+                }
+                return val;
+            }
+
+            // Toolbar bindings
+            if (btnAddNum) btnAddNum.addEventListener('click', function(){ addNumber(); });
+            if (btnAddOp) btnAddOp.addEventListener('click', function(){ addOperation(); });
+            if (btnClear) btnClear.addEventListener('click', function(){ root.children = []; selectedId=null; renderTree(); });
+            if (btnComputeSel) btnComputeSel.addEventListener('click', function(){
+                if (!selectedId) { alert('Select a node to compute.'); return; }
+                var node = findNode(root, selectedId);
+                if (!node || node.type==='root') { alert('Select an operation or number node.'); return; }
+                var v = computeAndAnnotate(node);
+                renderTree();
+                resultEl.textContent = String(v);
+            });
+            if (btnComputeAll) btnComputeAll.addEventListener('click', function(){
+                for (var i=0;i<root.children.length;i++) computeAndAnnotate(root.children[i]);
+                renderTree();
+            });
+
+            // Initial render
+            renderTree();
+        })();
+
+        // Keyboard shortcuts: calculator and queue
+        (function(){
+            function isTypingInField(e){
+                var t = e.target;
+                if (!t) return false;
+                var tag = (t.tagName||'').toLowerCase();
+                return tag === 'input' || tag === 'textarea' || (t.isContentEditable === true);
+            }
+            document.addEventListener('keydown', function(e){
+                if (isTypingInField(e)) return;
+                var k = e.key;
+                // Calculator shortcuts
+                if ((k >= '0' && k <= '9') || k === '.') { handleNumber(k); e.preventDefault(); return; }
+                if (k === '+' || k === '-' || k === '*' || k === '/') { handleOperator(k); e.preventDefault(); return; }
+                if (k === 'Enter' || k === '=') { evaluateExpression(); e.preventDefault(); return; }
+                if (k === 'Escape' || k === 'c' || k === 'C') { expression = ''; currentValue = '0'; updateDisplay(); e.preventDefault(); return; }
+                if (k === '%') { currentValue = String(parseFloat(currentValue||'0')/100); updateDisplay(); e.preventDefault(); return; }
+                if (k === 's' || k === 'S') { currentValue = String(parseFloat(currentValue||'0') * -1); updateDisplay(); e.preventDefault(); return; }
+                if (k === '^') { expression += currentValue + ' ** '; currentValue=''; updateDisplay(); e.preventDefault(); return; }
+                if (k === 'p' || k === 'P') { currentValue = String(Math.PI); updateDisplay(); e.preventDefault(); return; }
+
+                // Queue shortcuts
+                if (k === 'n' || k === 'N') { var btnN = document.getElementById('btn-add-number'); if (btnN) btnN.click(); e.preventDefault(); return; }
+                if (k === 'o' || k === 'O') { var btnO = document.getElementById('btn-add-op'); if (btnO) btnO.click(); e.preventDefault(); return; }
+                if (k === 'r' || k === 'R') { var btnR = document.getElementById('btn-compute-selected'); if (btnR) btnR.click(); e.preventDefault(); return; }
+                if (k === 'a' || k === 'A') { var btnA = document.getElementById('btn-compute-all'); if (btnA) btnA.click(); e.preventDefault(); return; }
+                if (k === 'x' || k === 'X') { var btnX = document.getElementById('btn-clear-queue'); if (btnX) btnX.click(); e.preventDefault(); return; }
+            });
+        })();
+    </script>
+</body>
+</html>
